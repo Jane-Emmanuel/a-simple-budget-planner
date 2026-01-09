@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Simple Budget Planner</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ec4899">
+
+<style>
+:root {
+  --pink-main:#ec4899;
+  --pink-dark:#db2777;
+  --pink-light:#fdf2f8;
+  --pink-border:#fbcfe8;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background: var(--pink-light);
+  display:flex;
+  justify-content:center;
+  padding-top:20px;
+  margin:0;
+}
+
+.app {
+  background:#fff;
+  width:360px;
+  padding:20px;
+  border-radius:8px;
+  box-shadow:0 0 12px rgba(0,0,0,.1);
+}
+
+h2 { text-align:center; color:var(--pink-dark); }
+
+input, select, button {
+  width:100%;
+  padding:8px;
+  margin-bottom:10px;
+}
+
+button {
+  background:var(--pink-main);
+  color:#fff;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+button:hover { background:var(--pink-dark); }
+
+.result {
+  text-align:center;
+  font-weight:bold;
+  font-size:13px;
+  margin-top:6px;
+}
+
+.savings-highlight {
+  color:#16a34a;
+  font-weight:bold;
+}
+
+/* Ads */
+.ad-overlay {
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.45);
+  opacity:0;
+  pointer-events:none;
+  transition:.3s;
+  z-index:1000;
+}
+
+.ad-overlay.show {
+  opacity:1;
+  pointer-events:auto;
+}
+
+.ad-section {
+  position:fixed;
+  left:0; right:0; bottom:-100%;
+  background:#fff;
+  border-top:3px solid var(--pink-main);
+  border-radius:20px 20px 0 0;
+  padding:16px;
+  max-height:75vh;
+  overflow:auto;
+  transition:.45s;
+  z-index:1001;
+}
+
+.ad-section.show { bottom:0; }
+
+.ad-card {
+  border:1px solid var(--pink-border);
+  border-radius:8px;
+  padding:10px;
+  margin-bottom:10px;
+}
+
+.ad-card a {
+  font-size:12px;
+  font-weight:bold;
+  color:var(--pink-main);
+  text-decoration:none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+<h2>Simple Budget Planner</h2>
+
+<input type="number" id="income" placeholder="Enter income">
+<input type="number" id="expenses" placeholder="Enter expenses">
+
+<select id="expenseCategory">
+  <option value="">Select expense category</option>
+  <option>Rent</option>
+  <option>Food</option>
+  <option>Transport</option>
+  <option>Utilities</option>
+  <option>Savings</option>
+  <option>Entertainment</option>
+</select>
+
+<select id="currency">
+  <option value="₦">NGN (₦)</option>
+  <option value="$">USD ($)</option>
+  <option value="€">EUR (€)</option>
+  <option value="£">GBP (£)</option>
+</select>
+
+<button onclick="calculateBudget()">Calculate Budget</button>
+
+<div class="result" id="result"></div>
+<div class="result" id="analytics"></div>
+<div class="result" id="categorySummary"></div>
+<div id="chartContainer" style="text-align:center;margin-top:8px;"></div>
+
+<hr>
+
+<h3 style="text-align:center;font-size:14px;color:#db2777;">Monthly History</h3>
+<div id="historyList" style="font-size:12px;"></div>
+
+<button onclick="openSettings()" style="background:#fbcfe8;color:#831843;">
+⚙️ Settings
+</button>
+</div>
+
+<!-- Ads -->
+<div class="ad-overlay" id="adOverlay"></div>
+
+<div class="ad-section" id="ads">
+  <div class="ad-card">
+    <h4>Breaking the Salary-to-Salary Circle</h4>
+    <p>Simple money systems.</p>
+    <a href="https://janeemmanuel5.gumroad.com/l/exazoj" target="_blank">Learn more</a>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="ad-overlay" id="settingsOverlay"></div>
+
+<div class="ad-section" id="settings">
+  <div class="ad-card">
+    <strong>About</strong>
+    <p style="font-size:12px;">
+      Simple Budget Planner helps you track income, expenses,
+      and spending patterns. Works offline.
+    </p>
+  </div>
+
+  <button onclick="closeSettings()">Close</button>
+</div>
+
+<script>
+/* ===== ELEMENTS ===== */
+const incomeEl = document.getElementById("income");
+const expensesEl = document.getElementById("expenses");
+const expenseCategoryEl = document.getElementById("expenseCategory");
+const currencyEl = document.getElementById("currency");
+
+const result = document.getElementById("result");
+const analytics = document.getElementById("analytics");
+const categorySummary = document.getElementById("categorySummary");
+const historyList = document.getElementById("historyList");
+
+const adsSection = document.getElementById("ads");
+const adOverlay = document.getElementById("adOverlay");
+const settingsSheet = document.getElementById("settings");
+const settingsOverlay = document.getElementById("settingsOverlay");
+
+let adsShownThisSession = false;
+
+/* ===== STORAGE ===== */
+function getStore(k, d=null){ return JSON.parse(localStorage.getItem(k)) ?? d; }
+function setStore(k,v){ localStorage.setItem(k,JSON.stringify(v)); }
+
+/* ===== ADS ===== */
+function showAds(){
+  if (adsShownThisSession) return;
+  adsSection.classList.add("show");
+  adOverlay.classList.add("show");
+  adsShownThisSession = true;
+}
+
+function hideAds(){
+  adsSection.classList.remove("show");
+  adOverlay.classList.remove("show");
+}
+
+/* ===== SETTINGS ===== */
+function openSettings(){
+  settingsSheet.classList.add("show");
+  settingsOverlay.classList.add("show");
+}
+
+function closeSettings(){
+  settingsSheet.classList.remove("show");
+  settingsOverlay.classList.remove("show");
+}
+
+/* ===== CALCULATOR ===== */
+function calculateBudget(){
+  const income = Number(incomeEl.value);
+  const expenses = Number(expensesEl.value);
+  const currency = currencyEl.value;
+  const category = expenseCategoryEl.value;
+
+  if(!income || !expenses || !category){
+    result.innerText="Please complete all fields";
+    return;
+  }
+
+  const balance = income - expenses;
+  const percent = Math.round((expenses/income)*100);
+
+  result.innerHTML = `<strong>Balance:</strong> ${currency}${balance}`;
+  analytics.innerHTML =
+    `<strong>Status:</strong> ${percent>80?"High spending":percent>60?"Moderate":"Healthy"}`;
+
+  categorySummary.innerHTML =
+    `${category} took <strong>${percent}%</strong> of income`;
+
+  category==="Savings"
+    ? categorySummary.classList.add("savings-highlight")
+    : categorySummary.classList.remove("savings-highlight");
+
+  saveHistory({income,expenses,category});
+  renderHistory();
+  showAds();
+}
+
+/* ===== HISTORY ===== */
+function saveHistory(entry){
+  const h = getStore("budgetHistory",[]);
+  h.push({...entry, date:new Date().toLocaleDateString()});
+  setStore("budgetHistory",h);
+}
+
+function renderHistory(){
+  const h = getStore("budgetHistory",[]);
+  historyList.innerHTML = h.slice(-5).reverse().map(e=>`
+    <div style="border:1px solid #fbcfe8;padding:6px;margin-bottom:6px;border-radius:6px;">
+      ${e.date}<br>
+      Income: ${e.income}<br>
+      Expenses: ${e.expenses}<br>
+      ${e.category}
+    </div>`).join("");
+}
+
+/* ===== INIT ===== */
+document.addEventListener("DOMContentLoaded",renderHistory);
+adOverlay.onclick = hideAds;
+settingsOverlay.onclick = closeSettings;
+
+/* PWA */
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("service-worker.js");
+}
+</script>
+
+</body>
+</html>
